@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CS 184 Homework 2 write-up: Bezier curves and surfaces, vertex normals, halfedge operations, and Loop subdivision." />
+  <meta name="keywords" content="meshedit, bezier curves, bezier surfaces, vertex normals, halfedge, edge flip, edge split, loop subdivision, subdivision surfaces" />
+
+  <title>CS 184 Homework 2 — Meshedit Write-up</title>
+
+  <!-- EB Garamond -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['\\(', '\\)']],
+      displayMath: [['\\[', '\\]']]
+    }
+  };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="course-line">CS 184</div>
+      <h1 class="title">Homework 2: Meshedit</h1>
+      <div class="byline">by Ellie Ghazaleh</div>
+
+      <div class="meta">
+        <div><span class="meta-label">Term:</span> Spring 2026</div>
+        <div><span class="meta-label">Repo:</span> hw2-meshedit-0l00ll00</div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Table of contents">
+    <div class="toc-inner">
+      <div class="toc-title">Contents</div>
+      <a href="#Introduction">Introduction</a>
+      <a href="#Part1">Part 1</a>
+      <a href="#Part2">Part 2</a>
+      <a href="#Part3">Part 3</a>
+      <a href="#Part4">Part 4</a>
+      <a href="#Part5">Part 5</a>
+      <a href="#Part6">Part 6</a>
+      <a href="#ExtraCredit">Extra Credit</a>
+    </div>
+  </nav>
+
+  <main class="page">
+
+    <section id="Introduction" class="content">
+      <h2>Introduction</h2>
+
+      <p class="placeholder">
+        In this project we implement bézier curve evaluation by applying de Casteljau’s algorithm, also known aside
+        iterated linear interpolation, to evaluate the intermediate levels in our interface. We apply de Casteljau's algorithm
+        in 1D, and then across the second parameter as surface evaluation. Our vertex normals are then computed in an
+        area-weighted average of adjacent face normals that result in smooth shading. Halfedge mesh edits edge flip and Edge
+        split support interactivity during editing. Loop subdivision upsampling allows us to refine the meshes while updating
+        our vertex and edge positions with loop rules. Many geometric operations allow reduction in repetitious local rules
+        like lerps for Bézier, local halfedge connectivity updates, and local stencils for subdivision.
+      </p>
+
+      <div class="subgrid">
+        <div>
+          <h3>Build / Run Notes</h3>
+          <p class="placeholder">
+            We worked on Windows in Visual Studio using the CMake Open Folder workflow in x64-Debug. Dependencies were provided through vcpkg and the CMake toolchain file was configured as
+            C:\vcpkg\scripts\buildsystems\vcpkg.cmake. We built using Build → Build All.
+            We ran meshedit.exe by passing a single input file as a command line argument through launch.vs.json. The file extension determines which part of the assignment runs.
+            We used .bzc files for Part 1, .bez files for Part 2, and .dae files for Parts 3 through 6.
+            Visual Studio runs the program from the build output directory out/build/x64-Debug, so relative paths for assets generally need ../../../ to reach the repository root.
+          </p>
+
+          <pre class="code"><code># Visual Studio CMake run arguments
+# launch.vs.json
+"args": ["../../../bzc/mycurve6.bzc"]
+
+# Input formats used in this assignment
+# .bzc  Bezier curves
+# .bez  Bezier surfaces
+# .dae  Triangle meshes</code></pre>
+        </div>
+
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/curve_b.jpg" alt="gentle 6 point curve level 0">
+            <figcaption class="caption">
+              Figure 1. Sanity check run showing a Bézier curve rendered from a 6 control point .bzc file.
+            </figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <div class="divider"></div>
+    </section>
+
+    <section id="Part1" class="content">
+      <h2>Part 1: Bezier Curves with 1D de Casteljau Subdivision</h2>
+
+      <h3>de Casteljau’s algorithm and our implementation</h3>
+		<p class="placeholder">
+		  In our function, de Casteljau’s algorithm evaluates a Bézier curve using repeated linear interpolation between adjacent control points.
+		  Given fixed points \(P_0,\dots,P_n\) and parameter \(t\in[0,1]\), one subdivision step produces \(n\) new points
+		  \(\{Q_0,\dots,Q_{n-1}\}\), where each point is computed by
+		  \[
+			Q_i = (1-t)P_i + tP_{i+1}, \qquad i = 0,\dots,n-1.
+		  \]
+		  Repeating this step reduces the point count by one each time until a single point remains, which is the evaluated point on the curve at \(t\).
+		  Our function BezierCurve::evaluateStep performs exactly one level of this computation and returns the next set of intermediate points.
+
+		  Each \(Q_i\) lies on the straight segment between \(P_i\) and \(P_{i+1}\), which is why the intermediate levels converge toward the final evaluated point.
+		  We implement one step of the algorithm inside BezierCurve::evaluateStep(...), to return the next row of intermediate points.
+		  By allocating the nextLevel vector, we compute each entry with one lerp.
+
+		  For each index \(i\), this allows us to compute
+		  \[
+			\text{nextLevel}[i] = (1-t)\cdot \text{points}[i] + t\cdot \text{points}[i+1].
+		  \]
+		  Our output length is \(\text{points.size()} - 1\), a result of interpolating the adjacent pairs.
+		  We also have the parameter \(t\), which is a class member used by our interface. Mouse wheel scrolling changes \(t\), which then triggers subsequent calls to evaluateStep,
+		  recomputing the intermediate levels with the newly detected value. When we call evaluateStep, the next level or row of the de Casteljau triangle is evaluated.
+		</p>
+
+		<h3>Our custom 6 control point curve and all evaluation levels</h3>
+		<p class="placeholder">
+		  We created our own custom .bzc file with 6 fixed control points, defining a degree-5 Bézier curve.
+		  In the viewer the control points are given by white points connected by the control polygon, and our Bézier curve is the smooth line in green when we toggle C.
+		  We then iterate between levels to show each step of de Casteljau's triangle.
+		  The number of points decreases by 1 each level, confirming that evaluateStep returns the properly sized nextLevel vector.
+
+		  For visual correctness we rely on the fact that the intermediate points at each level lie on the segments formed by the previous level, and that the final red point
+		  at level 5 lies on the green Bézier curve.
+
+		  Figures 2–7 show each level from the original control polygon down to the final evaluated point.
+		  We toggled the completed Bézier curve on using C while stepping levels using E.
+		</p>
+
+		<div class="eightgrid" id="Part1Grid">
+		  <figure class="figure">
+			<div class="figure-box">
+			  <img src="screenshots/level0.jpg" alt="Bezier curve level 0">
+			  <figcaption class="caption">Figure 2. Level 0 showing the 6 original control points and the completed curve.</figcaption>
+			</div>
+		  </figure>
+
+		  <figure class="figure">
+			<div class="figure-box">
+			  <img src="screenshots/level1.jpg" alt="Bezier curve level 1">
+			  <figcaption class="caption">Figure 3. Level 1 showing 5 intermediate points after one evaluation step.</figcaption>
+			</div>
+		  </figure>
+
+		  <figure class="figure">
+			<div class="figure-box">
+			  <img src="screenshots/level2.jpg" alt="Bezier curve level 2">
+			  <figcaption class="caption">Figure 4. Level 2 showing 4 intermediate points.</figcaption>
+			</div>
+		  </figure>
+
+		  <figure class="figure">
+			<div class="figure-box">
+			  <img src="screenshots/level3.jpg" alt="Bezier curve level 3">
+			  <figcaption class="caption">Figure 5. Level 3 showing 3 intermediate points.</figcaption>
+			</div>
+		  </figure>
+
+		  <figure class="figure">
+			<div class="figure-box">
+			  <img src="screenshots/level4.jpg" alt="Bezier curve level 4">
+			  <figcaption class="caption">Figure 6. Level 4 showing 2 intermediate points.</figcaption>
+			</div>
+		  </figure>
+
+		  <figure class="figure">
+			<div class="figure-box">
+			  <img src="screenshots/level5.jpg" alt="Bezier curve level 5">
+			  <figcaption class="caption">Figure 7. Level 5 showing the final evaluated point on the curve.</figcaption>
+			</div>
+		  </figure>
+
+		  <figure class="figure">
+			<div class="figure-box">
+			  <img src="screenshots/change_t.jpg" alt="t changed by scrolling">
+			  <figcaption class="caption">Figure 8. The same curve with a different parameter \(t\) selected by mouse scrolling.</figcaption>
+			</div>
+		  </figure>
+
+		  <figure class="figure">
+			<div class="figure-box">
+			  <img src="screenshots/curve_b.jpg" alt="gentler curve">
+			  <figcaption class="caption">Figure 9. A slightly different 6 control point curve with gentler amplitude.</figcaption>
+			</div>
+		  </figure>
+		</div>
+
+		<h3>A slightly different curve and changing \(t\) by scrolling</h3>
+		<p class="placeholder">
+		  To satisfy the comparison requirement, we used a second 6 control point curve with noticeably different placement.
+		  We also modified \(t\) for our original curve using mouse scrolling. Scrolling changes the evaluated point and intermediate levels while keeping the original control points fixed.
+
+		  Our \(t\) specifically controls where we evaluate the curve between its endpoints, where \(t=0\) corresponds to the first control point \(P_0\) and \(t=1\)
+		  corresponds to the last control point \(P_n\). When we modify \(t\), the interpolation weights \((1-t)\) and \(t\) are changed in every lerp step.
+
+		  When we use the same fixed points, changing \(t\) causes the blue points that represent all of our levels to shift, and the final evaluated point moves along our green Bézier curve.
+		  This is a result of evaluateStep recomputing nextLevel with the updated \(t\) each time, changing the output of the entire de Casteljau triangle.
+
+		  Furthermore we show a slightly different curve by modifying the control point coordinates to produce a curve with a gentle amplitude in the Bézier geometry.
+		  This specific case demonstrates that our output depends on the input control points, and a different set of control points produces a clearly visibly different curve,
+		  as well as consistent evaluation processes in our mapping and stepping.
+		</p>
+
+      <div class="divider"></div>
+    </section>
+
+    <section id="Part2" class="content">
+      <h2>Part 2: Bezier Surfaces with Separable 1D de Casteljau</h2>
+
+      <h3>How de Casteljau extends to Bézier surfaces and our implementation</h3>
+      <p class="placeholder">
+        We evaluate a Bézier surface using separable 1D de Casteljau.
+        We treat each row of the \(n\times n\) control grid as a Bézier curve and evaluate each row at parameter \(u\) to obtain \(n\) points.
+        Those \(n\) evaluated points form another Bézier curve, which we then evaluate at parameter \(v\).
+        The final point is the surface position at \((u,v)\in[0,1]^2\).
+        Our implementation follows this structure by using evaluateStep for a single level, evaluate1D to fully evaluate a curve at a parameter, and evaluate to evaluate the full patch.
+      </p>
+
+      <h3>Screenshot of bez/teapot.bez evaluated by our implementation</h3>
+      <p class="placeholder">
+        The screenshot below shows the teapot surface loaded from bez/teapot.bez and evaluated by our Bézier patch code.
+      </p>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part2.png" alt="Bezier surface teapot">
+            <figcaption class="caption">Figure 10. bez/teapot.bez evaluated by our implementation.</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <div class="divider"></div>
+    </section>
+
+    <section id="Part3" class="content">
+      <h2>Part 3: Area-Weighted Vertex Normals</h2>
+
+      <h3>How we implemented area-weighted vertex normals</h3>
+      <p class="placeholder">
+        We compute a smooth vertex normal by iterating over all faces incident to the vertex and summing each face normal weighted by face area.
+        For each neighboring triangle, we form two edge vectors from the triangle’s vertices and take their cross product to obtain a face normal whose magnitude is proportional to twice the triangle area.
+        We sum these area-weighted normals and normalize the result to produce a unit vertex normal.
+      </p>
+
+      <h3>Teapot shading comparison with and without vertex normals</h3>
+      <p class="placeholder">
+        We loaded dae/teapot.dae and toggled vertex normals using Q. The images below compare default flat shading and smooth Phong shading.
+      </p>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part3_before.png" alt="Flat shading">
+            <figcaption class="caption">Figure 11. dae/teapot.dae with default flat shading.</figcaption>
+          </div>
+        </figure>
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part3_after.png" alt="Smooth shading">
+            <figcaption class="caption">Figure 12. dae/teapot.dae with vertex normals enabled using Q.</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <div class="divider"></div>
+    </section>
+
+    <section id="Part4" class="content">
+      <h2>Part 4: Edge Flip</h2>
+
+      <h3>How we implemented edge flip and how we kept pointers consistent</h3>
+      <p class="placeholder">
+        Edge flip replaces the shared diagonal of two adjacent triangles with the other diagonal, without creating or deleting any mesh elements.
+        Our implementation reassigns halfedge next, twin, vertex, edge, and face pointers so that the local connectivity matches the flipped configuration.
+        We did not flip boundary edges and we kept the operation constant time by only touching the local neighborhood of the selected edge.
+      </p>
+
+      <h3>Teapot before and after edge flips</h3>
+      <p class="placeholder">
+        We loaded dae/teapot.dae, selected edges, and pressed F to flip them. The screenshots below show the teapot before and after several flips.
+      </p>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part4_before.png" alt="Teapot before edge flips">
+            <figcaption class="caption">Figure 13. Teapot before edge flips.</figcaption>
+          </div>
+        </figure>
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part4_after.png" alt="Teapot after edge flips">
+            <figcaption class="caption">Figure 14. Teapot after edge flips.</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <h3>Debugging notes</h3>
+      <p class="placeholder">
+        We validated edge flips by flipping multiple edges repeatedly and checking that the mesh remained manifold and hole-free.
+        We also checked that the selected edge and surrounding triangles updated as expected after each operation.
+      </p>
+
+      <div class="divider"></div>
+    </section>
+
+    <section id="Part5" class="content">
+      <h2>Part 5: Edge Split</h2>
+
+      <h3>How we implemented edge split and how we kept pointers consistent</h3>
+      <p class="placeholder">
+        Edge split inserts a new vertex at the midpoint of the selected edge and retriangulates the two adjacent faces into four triangles.
+        Our implementation creates only the necessary new elements and updates all halfedge connectivity pointers in the affected neighborhood.
+        We ignored boundary edge splits unless implementing the boundary extension.
+      </p>
+
+      <h3>Mesh before and after edge splits</h3>
+      <p class="placeholder">
+        The screenshots below show a mesh region before and after performing several edge splits using S.
+      </p>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part5_before.png" alt="Before edge splits">
+            <figcaption class="caption">Figure 15. Mesh before edge splits.</figcaption>
+          </div>
+        </figure>
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part5_after.png" alt="After edge splits">
+            <figcaption class="caption">Figure 16. Mesh after edge splits.</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <h3>Before and after a combination of edge splits and edge flips</h3>
+      <p class="placeholder">
+        We also tested that split edges can be flipped and that flipped edges can be split by alternating operations in multiple nearby and far apart regions of the mesh.
+      </p>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part5_combo_before.png" alt="Before split and flip combination">
+            <figcaption class="caption">Figure 17. Mesh before combining splits and flips.</figcaption>
+          </div>
+        </figure>
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part5_combo_after.png" alt="After split and flip combination">
+            <figcaption class="caption">Figure 18. Mesh after combining splits and flips.</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <h3>Debugging notes</h3>
+      <p class="placeholder">
+        We validated edge splits by checking that the new vertex is placed at the original edge midpoint and that the local triangulation matches the expected four-triangle configuration.
+        We confirmed the mesh stayed connected and that repeated operations did not create holes.
+      </p>
+
+      <div class="divider"></div>
+    </section>
+
+    <section id="Part6" class="content">
+      <h2>Part 6: Loop Subdivision for Mesh Upsampling</h2>
+
+      <h3>How we implemented loop subdivision</h3>
+      <p class="placeholder">
+        We implemented loop subdivision by computing new positions for old vertices and for the vertices inserted on old edges, then updating the mesh connectivity by splitting edges and flipping new edges that connect an old vertex to a new vertex.
+        We stored temporary values in Vertex::newPosition and Edge::newPosition, used isNew flags to track old versus new elements, and then copied the computed newPosition values into the final Vertex::position fields after connectivity was updated.
+      </p>
+
+      <h3>Observations and screenshots after loop subdivision</h3>
+      <p class="placeholder">
+        We observed that repeated subdivision smooths the mesh and softens sharp corners and edges.
+        We documented how sharp features become rounded and we tested whether pre-splitting edges can reduce the amount of feature shrinkage.
+      </p>
+
+      <div class="threecol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part6_0.png" alt="Loop subdivision iteration 0">
+            <figcaption class="caption">Figure 19. Loop subdivision iteration 0.</figcaption>
+          </div>
+        </figure>
+
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part6_1.png" alt="Loop subdivision iteration 1">
+            <figcaption class="caption">Figure 20. Loop subdivision iteration 1.</figcaption>
+          </div>
+        </figure>
+
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part6_2.png" alt="Loop subdivision iteration 2">
+            <figcaption class="caption">Figure 21. Loop subdivision iteration 2.</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <h3>Cube asymmetry experiment and preprocessing</h3>
+      <p class="placeholder">
+        We loaded dae/cube.dae and applied multiple iterations of loop subdivision, observing that the cube can become slightly asymmetric under repeated subdivision.
+        We documented the asymmetry and then pre-processed the cube using edge flips and edge splits to encourage symmetry under subdivision.
+        We explain why the asymmetry occurs and how the preprocessing makes the subdivided connectivity more symmetric.
+      </p>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part6_cube_before.png" alt="Cube before preprocessing">
+            <figcaption class="caption">Figure 22. dae/cube.dae after subdivision without preprocessing.</figcaption>
+          </div>
+        </figure>
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/part6_cube_after.png" alt="Cube after preprocessing">
+            <figcaption class="caption">Figure 23. dae/cube.dae after preprocessing with flips and splits and then subdivision.</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <div class="divider"></div>
+    </section>
+
+    <section id="ExtraCredit" class="content">
+      <h2>Extra Credit</h2>
+
+      <p class="placeholder">
+        If we implement extra credit extensions, we explain what we did and document how they work with screenshots here.
+      </p>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/extra_credit.png" alt="Extra credit result">
+            <figcaption class="caption">Figure 24. Extra credit result.</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <div class="divider"></div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="fineprint">
+        Ellie Ghazaleh CS 184 Spring 2026
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
