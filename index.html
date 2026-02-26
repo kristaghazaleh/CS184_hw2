@@ -224,29 +224,71 @@
     <section id="Part2" class="content">
       <h2>Part 2: Bezier Surfaces with Separable 1D de Casteljau</h2>
 
-      <h3>How de Casteljau extends to Bézier surfaces and our implementation</h3>
-      <p class="placeholder">
-        We evaluate a Bézier surface using separable 1D de Casteljau.
-        We treat each row of the \(n\times n\) control grid as a Bézier curve and evaluate each row at parameter \(u\) to obtain \(n\) points.
-        Those \(n\) evaluated points form another Bézier curve, which we then evaluate at parameter \(v\).
-        The final point is the surface position at \((u,v)\in[0,1]^2\).
-        Our implementation follows this structure by using evaluateStep for a single level, evaluate1D to fully evaluate a curve at a parameter, and evaluate to evaluate the full patch.
-      </p>
+      <h3>How de Casteljau Extends to Bézier Surfaces and Our Implementation</h3>
 
-      <h3>Screenshot of bez/teapot.bez evaluated by our implementation</h3>
-      <p class="placeholder">
-        The screenshot below shows the teapot surface loaded from bez/teapot.bez and evaluated by our Bézier patch code.
-      </p>
+		<p class="placeholder">
+		  A Bézier curve is evaluated using de Casteljau’s algorithm by repeatedly 
+		  interpolating between adjacent control points using a parameter 
+		  \( t \in [0,1] \). Given control points 
+		  \( P_0, P_1, \dots, P_{n-1} \), one level of interpolation produces 
+		  new points defined by
+		  \[
+			P_i^{(1)}(t) = (1 - t) P_i + t P_{i+1},
+			\quad \text{for } i = 0, \dots, n-2.
+		  \]
+		  This process is repeated until a single point remains, yielding the 
+		  curve value \( B(t) \). A Bézier surface patch extends this idea to 
+		  two parameters and is defined by an \( n \times n \) grid of control 
+		  points \( P_{i,j} \). To evaluate the surface at parameter pair 
+		  \( (u,v) \), we apply de Casteljau’s algorithm in a separable manner. 
+		  First, we fix \( u \) and treat each row of control points 
+		  \( \{ P_{0,j}, P_{1,j}, \dots, P_{n-1,j} \} \) as a Bézier curve in the 
+		  \( u \)-direction. Applying the 1D algorithm to each row produces 
+		  intermediate points \( Q_j(u) \). These intermediate points form a 
+		  Bézier curve in the \( v \)-direction, and applying the 1D 
+		  de Casteljau algorithm again with parameter \( v \) produces the final 
+		  surface point \( S(u,v) \). A Bézier surface is therefore a tensor 
+		  product of Bézier curves and can be evaluated independently along each 
+		  parameter direction. In this assignment, each cubic Bézier patch uses 
+		  a \( 4 \times 4 \) control point grid, so each surface evaluation 
+		  performs multiple levels of linear interpolation in both parameter 
+		  directions. De Casteljau’s algorithm is numerically stable because it 
+		  relies entirely on repeated linear interpolation rather than explicit 
+		  evaluation of Bernstein polynomials. The resulting surface lies within 
+		  the convex hull of its control points.
+		</p>
 
-      <div class="twocol">
-        <figure class="figure">
+	<h3>Screenshot of bez/teapot.bez Evaluated by Our Implementation</h3>
+
+		<p class="placeholder">
+		  The image below shows the teapot surface loaded from 
+		  bez/teapot.bez and evaluated by our Bézier patch implementation. 
+		  The function evaluateStep(points, t) performs one level of 
+		  de Casteljau interpolation by computing 
+		  \( (1 - t) P_i + t P_{i+1} \) for all adjacent control points. 
+		  Within evaluate1D(points, t), evaluateStep is repeatedly applied 
+		  until only one point remains, fully evaluating the Bézier curve at 
+		  parameter \( t \). The function evaluate(u, v) computes the Bézier 
+		  surface by first calling evaluate1D(row, u) for each row of control 
+		  points to produce intermediate points, then calling evaluate1D on 
+		  those intermediate points with parameter \( v \), and finally 
+		  returning the resulting three-dimensional position. The rendered 
+		  teapot confirms correct evaluation of cubic Bézier surface patches. 
+		  The smooth curvature of the body, spout, and handle indicates that 
+		  interpolation across each \( 4 \times 4 \) control grid is functioning 
+		  correctly, and the absence of discontinuities between patches 
+		  demonstrates consistent evaluation across patch boundaries.
+		</p>
+
+	  <figure class="figure">
           <div class="figure-box">
             <img src="screenshots/teapot.jpg" alt="Bezier surface teapot">
-            <figcaption class="caption">Figure 10. bez/teapot.bez evaluated by our implementation.</figcaption>
+            <figcaption class="caption">
+              Figure 10. bez/teapot.bez evaluated by our implementation.
+            </figcaption>
           </div>
         </figure>
       </div>
-
       <div class="divider"></div>
     </section>
 
