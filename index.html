@@ -227,6 +227,8 @@
       <h3>How de Casteljau Extends to Bézier Surfaces and Our Implementation</h3>
 
 		<p class="placeholder">
+		  After creating the Bézier curve successfully, we extrapolate our strategy
+		  to create 2D patches that form a surface of a 3D mesh.
 		  A Bézier curve is evaluated using de Casteljau’s algorithm by repeatedly 
 		  interpolating between adjacent control points using a parameter 
 		  \( t \in [0,1] \). Given control points 
@@ -293,31 +295,87 @@
     </section>
 
     <section id="Part3" class="content">
-      <h2>Part 3: Area-Weighted Vertex Normals</h2>
+    <h2>Part 3: Area-Weighted Vertex Normals</h2>
 
-      <h3>How we implemented area-weighted vertex normals</h3>
-      <p class="placeholder">
-        We compute a smooth vertex normal by iterating over all faces incident to the vertex and summing each face normal weighted by face area.
-        For each neighboring triangle, we form two edge vectors from the triangle’s vertices and take their cross product to obtain a face normal whose magnitude is proportional to twice the triangle area.
-        We sum these area-weighted normals and normalize the result to produce a unit vertex normal.
-      </p>
+	<h3>How we implemented area-weighted vertex normals</h3>
+		<div class="placeholder">
+		  <p>
+			In exploring area-weighted vertex normals, we implemented Vertex::normal() to compute
+			smooth or Phong vertex normals for a triangle mesh using the halfedge data structure.
+			For each vertex, we traverse the one-ring of adjacent faces and compute each triangle’s
+			area-weighted face normal using a cross product. We then sum the contributions and
+			normalize the result to return a unit vector.
+		  </p>
 
-      <h3>Teapot shading comparison with and without vertex normals</h3>
-      <p class="placeholder">
-        We loaded dae/teapot.dae and toggled vertex normals using Q. The images below compare default flat shading and smooth Phong shading.
-      </p>
+		  <p>
+			We start from the vertex’s outgoing halfedge using HalfedgeCIter h0 = halfedge();.
+			We iterate around the one ring using an iterator step h = h&rarr;twin()&rarr;next().
+			We stop when we return to the starting halfedge, looping with h == h0 as our stopping
+			condition. This allows us to contact each face once without looping infinitely. We
+			skip boundary faces by checking h&rarr;face()&rarr;isBoundary(), since boundary loops are
+			represented as virtual faces and should not contribute to the shading normal.
+		  </p>
+
+		  <p>
+			In the halfedge mesh, each face stores halfedges whose next() pointers traverse the face
+			boundary in counterclockwise winding order with respect to the outward direction of the
+			face. Each halfedge is directed, with h&rarr;vertex() as the start vertex of the halfedge,
+			and h&rarr;next()&rarr;vertex() as the next vertex along the counterclockwise loop. The
+			consistent winding order matters because our cross products use the right-hand rule,
+			and this keeps our normals oriented in the proper direction. Swapping the order would
+			flip the normals and can produce incorrect shading that appears inverted or overly dark.
+		  </p>
+
+		  <p>
+			To compute these normals, we include area-weighted face normals that use triangle corners
+			p<sub>0</sub>, p<sub>1</sub>, and p<sub>2</sub> in counterclockwise order. Our edge
+			vectors are computed using
+			e<sub>1</sub> = p<sub>1</sub> - p<sub>0</sub> and
+			e<sub>2</sub> = p<sub>2</sub> - p<sub>0</sub>. We then compute the cross product
+			n<sub>f</sub> = e<sub>1</sub> &times; e<sub>2</sub>. This is area weighted by the
+			magnitude,
+			&#8741;e<sub>1</sub> &times; e<sub>2</sub>&#8741; = 2A, which is directly proportional
+			to the triangle’s area. Vertex normals are computed by summing and normalizing,
+			N<sub>v</sub> = normalize(&#8721; n<sub>f</sub>).
+		  </p>
+
+		  <p>
+			For each non-boundary face, we used the current halfedge h to read the triangle’s three
+			vertices directly from the data structure:
+			p<sub>0</sub> = h&rarr;vertex()&rarr;position,
+			p<sub>1</sub> = h&rarr;next()&rarr;vertex()&rarr;position, and
+			p<sub>2</sub> = h&rarr;next()&rarr;next()&rarr;vertex()&rarr;position. Finally, the
+			accumulated area-weighted normal is computed as
+			N += cross(p<sub>1</sub> - p<sub>0</sub>, p<sub>2</sub> - p<sub>0</sub>);. After
+			summing, if we find the degenerate case we return (0, 0, 0) to avoid division by zero.
+			Otherwise, we return the unit-length vector N.unit() that results in correct lighting.
+		  </p>
+	</div>
+
+	<h3>Teapot shading comparison with and without vertex normals</h3>
+	<div class="placeholder">
+	  <p>
+		We loaded dae/teapot.dae and toggled vertex normals using Q. The implementation results
+		in a clear visual difference between flat shading using per-face normals and smooth
+		Phong shading using per-vertex normals. The difference is apparent in the lighting,
+		highlights, and shading across the teapot’s surface. The Phong shading displays visible
+		reduction in faceting and offers smoother highlight transitions, indicating that the
+		computed per-vertex normals are being applied as intended.
+	  </p>
+</div>
+	</div>
 
       <div class="twocol">
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part3_before.png" alt="Flat shading">
+            <img src="screenshots/teapot_flat.jpg" alt="Flat shading">
             <figcaption class="caption">Figure 11. dae/teapot.dae with default flat shading.</figcaption>
           </div>
         </figure>
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part3_after.png" alt="Smooth shading">
-            <figcaption class="caption">Figure 12. dae/teapot.dae with vertex normals enabled using Q.</figcaption>
+            <img src="screenshots/teapot_phong.jpg" alt="Smooth/Phong shading">
+            <figcaption class="caption">Figure 12. dae/teapot.dae with vertex normals enabled.</figcaption>
           </div>
         </figure>
       </div>
