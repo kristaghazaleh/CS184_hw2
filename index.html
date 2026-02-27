@@ -81,13 +81,13 @@
           </p>
 
           <pre class="code"><code># Visual Studio CMake run arguments
-# launch.vs.json
-"args": ["../../../bzc/mycurve6.bzc"]
+			# launch.vs.json
+			"args": ["../../../bzc/mycurve6.bzc"]
 
-# Input formats used in this assignment
-# .bzc  Bezier curves
-# .bez  Bezier surfaces
-# .dae  Triangle meshes</code></pre>
+			# Input formats used in this assignment
+			# .bzc  Bezier curves
+			# .bez  Bezier surfaces
+			# .dae  Triangle meshes</code></pre>
         </div>
 
         <figure class="figure">
@@ -477,22 +477,93 @@
     <section id="Part5" class="content">
       <h2>Part 5: Edge Split</h2>
 
-      <h3>How we implemented edge split and how we kept pointers consistent</h3>
-      <p class="placeholder">
-        Edge split inserts a new vertex at the midpoint of the selected edge and retriangulates the two adjacent faces into four triangles.
-        Our implementation creates only the necessary new elements and updates all halfedge connectivity pointers in the affected neighborhood.
-        We ignored boundary edge splits unless implementing the boundary extension.
-      </p>
+		<h3>How we implemented edge split and how we kept pointers consistent</h3>
+		<div class="placeholder">
+		  <p>
+			Edge split inserts a new vertex at the midpoint of the selected edge and retriangulates
+			the two adjacent faces into four triangles. Our implementation creates only the
+			necessary new elements and updates all halfedge connectivity pointers in the affected
+			neighborhood. We ignored boundary edge splits unless implementing the boundary
+			extension. By testing the operation, we see that we can split edges and still add
+			additional flips, confirming that split and flip work properly together.
+		  </p>
 
-      <h3>Mesh before and after edge splits</h3>
-      <p class="placeholder">
-        The screenshots below show a mesh region before and after performing several edge splits using S.
-      </p>
+		  <p>
+			Our function HalfedgeMesh::splitEdge(e<sub>0</sub>) returns the VertexIter to the newly
+			inserted vertex, whose position is the midpoint of the original edge endpoints. In this
+			case we do not split boundary edges, and we do constant time local work by operating on
+			the two incident triangles and their immediate neighbors. By maintaining a valid halfedge
+			mesh, we verify that there are no dangling pointers or floating elements, and that faces
+			maintain correct loop winding order and twin relationships. The halfedge pointer of the
+			new vertex points along the edge that was split, rather than along newly created edges.
+		  </p>
 
-      <h3>Before and after a combination of edge splits and edge flips</h3>
-      <p class="placeholder">
-        We also tested that split edges can be flipped and that flipped edges can be split by alternating operations in multiple nearby and far apart regions of the mesh.
-      </p>
+		  <p>
+			We start with an interior edge (b, c) shared by two triangles with opposite vertices a
+			and d. The new vertex is inserted at the midpoint,
+			m = (b + c) / 2. The two triangles are then replaced with four triangles by connecting m
+			to the opposite vertices, producing (b, m, a), (m, c, a), (m, b, d), and (c, m, d). This
+			changes local connectivity while keeping the original surface geometry. We modify the
+			two adjacent faces to e<sub>0</sub>, their six halfedges, and the four connecting vertices.
+			We create one new vertex m, two new faces, and three new edges for the new connections.
+			The corresponding new halfedges are generated to represent each of the edges. Everything
+			outside this neighborhood remains unchanged, and the operation runs in O(1) time.
+		  </p>
+
+		  <p>
+			Our function traverses the halfedge structure by starting with
+			h<sub>0</sub> = e<sub>0</sub>&rarr;halfedge() and
+			h<sub>3</sub> = h<sub>0</sub>&rarr;twin(). We operate on the faces
+			f<sub>0</sub> = h<sub>0</sub>&rarr;face() and
+			f<sub>1</sub> = h<sub>3</sub>&rarr;face(). The remaining halfedges are collected using the
+			next pointers,
+			h<sub>1</sub> = h<sub>0</sub>&rarr;next(),
+			h<sub>2</sub> = h<sub>1</sub>&rarr;next(),
+			h<sub>4</sub> = h<sub>3</sub>&rarr;next(), and
+			h<sub>5</sub> = h<sub>4</sub>&rarr;next(). Finally we take the four vertices,
+			b = h<sub>0</sub>&rarr;vertex(),
+			c = h<sub>3</sub>&rarr;vertex(),
+			a = h<sub>2</sub>&rarr;vertex(), and
+			d = h<sub>5</sub>&rarr;vertex(). If e<sub>0</sub> is on the boundary or either face is a
+			boundary loop, we return safely without performing the split.
+		  </p>
+
+		  <p>
+			We kept pointers consistent by reusing the original edge e<sub>0</sub> as one of the
+			two new edges after the split by turning it into the edge (b, m). Its two halfedges are
+			also reused, so h<sub>0</sub> becomes b&rarr;m and h<sub>3</sub> becomes m&rarr;b, which
+			preserves the twin relationship. The remaining new edges (m, c), (m, a), and (m, d) are
+			created as new edges with new twin halfedge pairs. The resulting four triangles have next
+			pointers constructed to form counterclockwise 3-cycles, and each halfedge face pointer is
+			set to its corresponding face. We also updated each face to reference a halfedge on its
+			boundary after reconstruction. Each vertex’s halfedge pointer is updated to reference a
+			valid outgoing halfedge, and the new vertex’s halfedge pointer lies along the edge that
+			was split.
+		  </p>
+		</div>
+
+		<h3>Mesh before and after edge splits</h3>
+		<div class="placeholder">
+		  <p>
+			The screenshots below show a mesh region before and after performing several edge splits
+			using S. The before image shows the original triangulation, and the after image shows
+			additional split edges with new faces created on the belly of the teapot. The overall
+			geometric shape and form remain the same, while the local triangle density increases in
+			the intentionally refined region.
+		  </p>
+		</div>
+
+		<h3>Before and after a combination of edge splits and edge flips</h3>
+		<div class="placeholder">
+		  <p>
+			We also tested that split edges can be flipped and that flipped edges can be split by
+			alternating operations in multiple nearby and far apart regions of the mesh. The image of
+			splits exclusively serves as the before image for the combined result. In the final image
+			we included flips both inside the altered region and outside of it to show that our split
+			and flip functions work in combination and continue functioning correctly after changes in
+			the mesh.
+		  </p>
+		</div>
 
       <div class="threecol">
         <figure class="figure">
