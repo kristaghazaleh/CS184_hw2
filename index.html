@@ -31,7 +31,7 @@
     <div class="hero-inner">
       <div class="course-line">CS 184</div>
       <h1 class="title">Homework 2: Meshedit</h1>
-      <div class="byline">by Ellie Ghazaleh</div>
+      <div class="byline">by Ellie Ghazaleh and Johanna Liu</div>
 
       <div class="meta">
         <div><span class="meta-label">Term:</span> Spring 2026</div>
@@ -489,46 +489,33 @@
         The screenshots below show a mesh region before and after performing several edge splits using S.
       </p>
 
-      <div class="twocol">
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/part5_before.png" alt="Before edge splits">
-            <figcaption class="caption">Figure 15. Mesh before edge splits.</figcaption>
-          </div>
-        </figure>
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/part5_after.png" alt="After edge splits">
-            <figcaption class="caption">Figure 16. Mesh after edge splits.</figcaption>
-          </div>
-        </figure>
-      </div>
-
       <h3>Before and after a combination of edge splits and edge flips</h3>
       <p class="placeholder">
         We also tested that split edges can be flipped and that flipped edges can be split by alternating operations in multiple nearby and far apart regions of the mesh.
       </p>
 
-      <div class="twocol">
+      <div class="threecol">
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part5_combo_before.png" alt="Before split and flip combination">
-            <figcaption class="caption">Figure 17. Mesh before combining splits and flips.</figcaption>
+            <img src="screenshots/before_split.jpg" alt="before split">
+            <figcaption class="caption">Figure 15. Teapot before edge splitting.</figcaption>
           </div>
         </figure>
+
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part5_combo_after.png" alt="After split and flip combination">
-            <figcaption class="caption">Figure 18. Mesh after combining splits and flips.</figcaption>
+            <img src="screenshots/after_split.jpg" alt="after splitting">
+            <figcaption class="caption">Figure 16. Teapot after edge splitting, before edge flipping.</figcaption>
+          </div>
+        </figure>
+
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/split_flip.jpg" alt="both edge splitting and flipping">
+            <figcaption class="caption">Figure 17. Teapot after both edge splitting and flipping.</figcaption>
           </div>
         </figure>
       </div>
-
-      <h3>Debugging notes</h3>
-      <p class="placeholder">
-        We validated edge splits by checking that the new vertex is placed at the original edge midpoint and that the local triangulation matches the expected four-triangle configuration.
-        We confirmed the mesh stayed connected and that repeated operations did not create holes.
-      </p>
 
       <div class="divider"></div>
     </section>
@@ -620,7 +607,7 @@
   <footer class="footer">
     <div class="footer-inner">
       <div class="fineprint">
-        Ellie Ghazaleh CS 184 Spring 2026
+        Ellie Ghazaleh and Johanna Liu CS 184 Spring 2026
       </div>
     </div>
   </footer>
