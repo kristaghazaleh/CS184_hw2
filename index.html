@@ -387,37 +387,89 @@
       <h2>Part 4: Edge Flip</h2>
 
       <h3>How we implemented edge flip and how we kept pointers consistent</h3>
-      <p class="placeholder">
-        Edge flip replaces the shared diagonal of two adjacent triangles with the other diagonal, without creating or deleting any mesh elements.
-        Our implementation reassigns halfedge next, twin, vertex, edge, and face pointers so that the local connectivity matches the flipped configuration.
-        We did not flip boundary edges and we kept the operation constant time by only touching the local neighborhood of the selected edge.
-      </p>
+		<div class="placeholder">
+		  <p>
+			We constructed HalfedgeMesh::flipEdge(e0) to perform an edge flip in the halfedge mesh by
+			redirecting pointers in the local adjacent triangle neighborhood around the selected edge.
+			Flipping replaces the shared diagonal of two adjacent triangles with the alternate diagonal,
+			without changing the surface boundary or creating holes. We kept the operation contained by
+			only manipulating elements adjacent to the selected edge, which also keeps the method
+			constant time. Our function returns an iterator to the flipped edge, and we do not flip
+			boundary edges. If the selected edge is located on the boundary, it remains unaltered and
+			we return e0 immediately.
+		  </p>
 
-      <h3>Teapot before and after edge flips</h3>
-      <p class="placeholder">
-        We loaded dae/teapot.dae, selected edges, and pressed F to flip them. The screenshots below show the teapot before and after several flips.
-      </p>
+		  <p>
+			The interior edge is shared by two triangles, forming a quad of four vertices. Before the
+			edge flip, the two triangles share diagonal (b, c) and have opposite vertices a and d.
+			The flip exchanges the diagonal (b, c) with (a, d) and produces two new triangles that
+			cover the same quad polygon as a purely topological update. In our local neighborhood we
+			handle one edge e<sub>0</sub>, two faces adjacent to e<sub>0</sub>, and four vertices,
+			including the two endpoints of e<sub>0</sub> and the two opposite vertices from the
+			adjacent triangles. Everything outside this neighborhood remains unchanged, which helps
+			prevent holes during the edge flip.
+		  </p>
+
+		  <p>
+			Our halfedge traversal starts from one halfedge of the selected edge:
+			h<sub>0</sub> = e<sub>0</sub>&rarr;halfedge() and its twin
+			h<sub>3</sub> = h<sub>0</sub>&rarr;twin(). The two incident faces are
+			f<sub>0</sub> = h<sub>0</sub>&rarr;face() and
+			f<sub>1</sub> = h<sub>3</sub>&rarr;face(). The remaining halfedges of each
+			triangle are obtained using next pointers. For the first face we use
+			h<sub>1</sub> = h<sub>0</sub>&rarr;next() and
+			h<sub>2</sub> = h<sub>1</sub>&rarr;next(), and for the second face we use
+			h<sub>4</sub> = h<sub>3</sub>&rarr;next() and
+			h<sub>5</sub> = h<sub>4</sub>&rarr;next(). The vertices are read from the
+			halfedges as
+			b = h<sub>0</sub>&rarr;vertex(),
+			c = h<sub>3</sub>&rarr;vertex(),
+			a = h<sub>2</sub>&rarr;vertex(), and
+			d = h<sub>5</sub>&rarr;vertex().
+		  </p>
+
+		  <p>
+			During the pointer updates, we reuse h<sub>0</sub> and h<sub>3</sub> as the new diagonal
+			halfedges so that h<sub>0</sub> becomes a&rarr;d and h<sub>3</sub> becomes d&rarr;a.
+			We then rewire the next pointers so each face forms a counterclockwise loop after the
+			flip. One face cycle becomes (a&rarr;d), (d&rarr;c), (c&rarr;a), and the other face
+			cycle becomes (d&rarr;a), (a&rarr;b), (b&rarr;d). Each involved halfedge has its face
+			pointer updated so the three halfedges in the cycle point to the correct face, and each
+			face is updated to reference a valid boundary halfedge after reconstructing the loop.
+			We also update the vertex halfedge pointers so all four vertices still point to a valid
+			outgoing halfedge. Through this, e<sub>0</sub> continues to reference one of its halfedges,
+			surrounding edge pointers remain consistent, and the winding order stays valid so no holes
+			are formed.
+		  </p>
+		</div>
+
+		<h3>Teapot before and after edge flips</h3>
+		<div class="placeholder">
+		  <p>
+			We loaded dae/teapot.dae, selected interior edges, and pressed F to flip them. We confirmed
+			the mesh remained manifold and hole-free, where the triangulation changes locally around the
+			flipped edges without changing the overall teapot surface. This demonstrates a change in
+			connectivity without moving any vertices. The edge flip is treated as local pointer surgery,
+			where the six halfedges and four vertices in the neighborhood are identified before changes
+			are made. All relevant pointers were updated explicitly to avoid stale references and keep
+			the implementation robust during repeated flips.
+		  </p>
+		</div>
 
       <div class="twocol">
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part4_before.png" alt="Teapot before edge flips">
+            <img src="screenshots/flip_before.jpg" alt="Teapot before edge flips">
             <figcaption class="caption">Figure 13. Teapot before edge flips.</figcaption>
           </div>
         </figure>
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part4_after.png" alt="Teapot after edge flips">
+            <img src="screenshots/flip_after.jpg" alt="Teapot after edge flips">
             <figcaption class="caption">Figure 14. Teapot after edge flips.</figcaption>
           </div>
         </figure>
       </div>
-
-      <h3>Debugging notes</h3>
-      <p class="placeholder">
-        We validated edge flips by flipping multiple edges repeatedly and checking that the mesh remained manifold and hole-free.
-        We also checked that the selected edge and surrounding triangles updated as expected after each operation.
-      </p>
 
       <div class="divider"></div>
     </section>
