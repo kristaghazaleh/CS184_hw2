@@ -591,7 +591,7 @@
       <div class="divider"></div>
     </section>
 
-    <section id="Part6" class="content">
+ <section id="Part6" class="content">
       <h2>Part 6: Loop Subdivision for Mesh Upsampling</h2>
 
       <h3>How we implemented loop subdivision</h3>
@@ -606,25 +606,61 @@
         We documented how sharp features become rounded and we tested whether pre-splitting edges can reduce the amount of feature shrinkage.
       </p>
 
+      <h3>Cube: successive Loop subdivision iterations</h3>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/division_0.jpg" alt="Cube loop subdivision iteration 0">
+            <figcaption class="caption">Figure 19. Cube subdivision, iteration 0 (L0).</figcaption>
+          </div>
+        </figure>
+
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/division_1.jpg" alt="Cube loop subdivision iteration 1">
+            <figcaption class="caption">Figure 20. Cube subdivision, iteration 1 (L1).</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <div class="twocol">
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/division_2.jpg" alt="Cube loop subdivision iteration 2">
+            <figcaption class="caption">Figure 21. Cube subdivision, iteration 2 (L2).</figcaption>
+          </div>
+        </figure>
+
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/division_3.jpg" alt="Cube loop subdivision iteration 3">
+            <figcaption class="caption">Figure 22. Cube subdivision, iteration 3 (L3).</figcaption>
+          </div>
+        </figure>
+      </div>
+
+      <h3>Other mesh behavior: cow model</h3>
+
       <div class="threecol">
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part6_0.png" alt="Loop subdivision iteration 0">
-            <figcaption class="caption">Figure 19. Loop subdivision iteration 0.</figcaption>
+            <img src="screenshots/cow_0.jpg" alt="Cow loop subdivision iteration 0">
+            <figcaption class="caption">Figure 23. Cow mesh before subdivision (L0).</figcaption>
           </div>
         </figure>
 
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part6_1.png" alt="Loop subdivision iteration 1">
-            <figcaption class="caption">Figure 20. Loop subdivision iteration 1.</figcaption>
+            <img src="screenshots/cow_1.jpg" alt="Cow loop subdivision iteration 1">
+            <figcaption class="caption">Figure 24. Cow mesh after one subdivision (L1).</figcaption>
           </div>
         </figure>
 
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part6_2.png" alt="Loop subdivision iteration 2">
-            <figcaption class="caption">Figure 21. Loop subdivision iteration 2.</figcaption>
+            <img src="screenshots/cow_2.jpg" alt="Cow loop subdivision iteration 2">
+            <figcaption class="caption">Figure 25. Cow mesh after three subdivisions (L3).</figcaption>
           </div>
         </figure>
       </div>
@@ -636,17 +672,25 @@
         We explain why the asymmetry occurs and how the preprocessing makes the subdivided connectivity more symmetric.
       </p>
 
-      <div class="twocol">
+      <div class="threecol">
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part6_cube_before.png" alt="Cube before preprocessing">
-            <figcaption class="caption">Figure 22. dae/cube.dae after subdivision without preprocessing.</figcaption>
+            <img src="screenshots/division_sf.jpg" alt="Cube without preprocessing after repeated subdivision">
+            <figcaption class="caption">Figure 26. Cube after repeated subdivision without preprocessing (asymmetry visible).</figcaption>
           </div>
         </figure>
+
         <figure class="figure">
           <div class="figure-box">
-            <img src="screenshots/part6_cube_after.png" alt="Cube after preprocessing">
-            <figcaption class="caption">Figure 23. dae/cube.dae after preprocessing with flips and splits and then subdivision.</figcaption>
+            <img src="screenshots/sf_0.jpg" alt="Cube after preprocessing before subdivision">
+            <figcaption class="caption">Figure 27. Cube after preprocessing (edge flips/splits), before subdivision (L0).</figcaption>
+          </div>
+        </figure>
+
+        <figure class="figure">
+          <div class="figure-box">
+            <img src="screenshots/sf_2.jpg" alt="Cube after preprocessing and subdivision">
+            <figcaption class="caption">Figure 28. Cube after preprocessing and the same number of subdivisions (reduced asymmetry).</figcaption>
           </div>
         </figure>
       </div>
