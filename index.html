@@ -592,130 +592,224 @@
     </section>
 
  <section id="Part6" class="content">
-      <h2>Part 6: Loop Subdivision for Mesh Upsampling</h2>
+  <h2>Part 6: Loop Subdivision for Mesh Upsampling</h2>
 
-      <h3>How we implemented loop subdivision</h3>
-      <p class="placeholder">
-        We implemented loop subdivision by computing new positions for old vertices and for the vertices inserted on old edges, then updating the mesh connectivity by splitting edges and flipping new edges that connect an old vertex to a new vertex.
-        We stored temporary values in Vertex::newPosition and Edge::newPosition, used isNew flags to track old versus new elements, and then copied the computed newPosition values into the final Vertex::position fields after connectivity was updated.
-      </p>
+  <h3>How we implemented loop subdivision</h3>
 
-      <h3>Observations and screenshots after loop subdivision</h3>
-      <p class="placeholder">
-        We observed that repeated subdivision smooths the mesh and softens sharp corners and edges.
-        We documented how sharp features become rounded and we tested whether pre-splitting edges can reduce the amount of feature shrinkage.
-      </p>
+	  <div class="placeholder">
+		<p>
+		  Our goal for Part 6 was to implement MeshResampler::upsample(HalfedgeMesh& mesh)
+		  to perform Loop subdivision on triangle meshes. We followed a five stage algorithm
+		  that first marks original elements, then computes new positions, updates connectivity,
+		  and finally commits positions.
+		</p>
 
-      <h3>Cube: successive Loop subdivision iterations</h3>
+		<p>
+		  We begin by marking the original elements of the mesh. We loop over all vertices and
+		  set v&rarr;isNew = false, and loop over all edges and set e&rarr;isNew = false.
+		  Next we compute new positions for all original vertices using the Loop vertex rule.
+		  For each vertex, we let \(n = v\!\rightarrow\!\text{degree}()\), which is the number of
+		  one-ring neighbors. We choose the weight \(u\) by
+		</p>
 
-      <div class="twocol">
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/division_0.jpg" alt="Cube loop subdivision iteration 0">
-            <figcaption class="caption">Figure 19. Cube subdivision, iteration 0 (L0).</figcaption>
-          </div>
-        </figure>
+		\[
+		  u =
+		  \begin{cases}
+			\frac{3}{16}, & n = 3,\\
+			\frac{3}{8n}, & \text{otherwise.}
+		  \end{cases}
+		\]
 
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/division_1.jpg" alt="Cube loop subdivision iteration 1">
-            <figcaption class="caption">Figure 20. Cube subdivision, iteration 1 (L1).</figcaption>
-          </div>
-        </figure>
-      </div>
+		<p>
+		  We traverse the one-ring by starting at h = v&rarr;halfedge() and iterating
+		  h = h&rarr;twin()&rarr;next() until we return to the starting halfedge. We sum the
+		  neighbor positions \(\sum_{i=1}^{n} p_i\) and store the updated vertex position in
+		  Vertex::newPosition:
+		</p>
 
-      <div class="twocol">
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/division_2.jpg" alt="Cube loop subdivision iteration 2">
-            <figcaption class="caption">Figure 21. Cube subdivision, iteration 2 (L2).</figcaption>
-          </div>
-        </figure>
+		\[
+		  v.\text{newPosition} =
+		  (1 - n u)\, v.\text{position} + u \sum_{i=1}^{n} p_i.
+		\]
 
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/division_3.jpg" alt="Cube loop subdivision iteration 3">
-            <figcaption class="caption">Figure 22. Cube subdivision, iteration 3 (L3).</figcaption>
-          </div>
-        </figure>
-      </div>
+		<p>
+		  We store these results first and do not overwrite Vertex::position until the end,
+		  so all computations use the original mesh positions.
+		</p>
 
-      <h3>Other mesh behavior: cow model</h3>
+		<p>
+		  We then compute the target positions for vertices that will be inserted on original
+		  edges using the Loop edge rule. For each non-boundary edge e, we let h = e&rarr;halfedge().
+		  The endpoints are
+		  \(A = h\!\rightarrow\!\text{vertex}()\!\rightarrow\!\text{position}\) and
+		  \(B = h\!\rightarrow\!\text{twin}()\!\rightarrow\!\text{vertex}()\!\rightarrow\!\text{position}\).
+		  The opposite vertices are
+		  \(C = h\!\rightarrow\!\text{next}()\!\rightarrow\!\text{next}()\!\rightarrow\!\text{vertex}()\!\rightarrow\!\text{position}\)
+		  and
+		  \(D = h\!\rightarrow\!\text{twin}()\!\rightarrow\!\text{next}()\!\rightarrow\!\text{next}()\!\rightarrow\!\text{vertex}()\!\rightarrow\!\text{position}\).
+		  We store the edge target in Edge::newPosition:
+		</p>
 
-      <div class="threecol">
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/cow_0.jpg" alt="Cow loop subdivision iteration 0">
-            <figcaption class="caption">Figure 23. Cow mesh before subdivision (L0).</figcaption>
-          </div>
-        </figure>
+		\[
+		  e.\text{newPosition} = \frac{3}{8}(A + B) + \frac{1}{8}(C + D).
+		\]
 
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/cow_1.jpg" alt="Cow loop subdivision iteration 1">
-            <figcaption class="caption">Figure 24. Cow mesh after one subdivision (L1).</figcaption>
-          </div>
-        </figure>
+		<p>
+		  To split every original edge exactly once, we first copy all original edges into a
+		  vector originalEdges, then iterate over that list and call VertexIter m = mesh.splitEdge(e).
+		  We mark the inserted vertex as new with m&rarr;isNew = true, and assign its target position
+		  with m&rarr;newPosition = e&rarr;newPosition. We consistently skip boundary edges,
+		  which matches our Part 5 behavior.
+		</p>
 
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/cow_2.jpg" alt="Cow loop subdivision iteration 2">
-            <figcaption class="caption">Figure 25. Cow mesh after three subdivisions (L3).</figcaption>
-          </div>
-        </figure>
-      </div>
+		<p>
+		  After splitting, we flip the new edges that connect an old vertex to a new vertex.
+		  Concretely, for each edge we examine the endpoints
+		  v1 = e&rarr;halfedge()&rarr;vertex() and v2 = e&rarr;halfedge()&rarr;twin()&rarr;vertex().
+		  We flip only when e&rarr;isNew is true and v1&rarr;isNew is not equal to v2&rarr;isNew.
+		  This matches the Loop rule to flip only the subdivision diagonals, and not the split halves
+		  of original edges. Finally, after all connectivity updates are complete, we commit the
+		  updated positions by setting v&rarr;position = v&rarr;newPosition for all vertices.
+		</p>
 
-      <h3>Cube asymmetry experiment and preprocessing</h3>
-      <p class="placeholder">
-        We loaded dae/cube.dae and applied multiple iterations of loop subdivision, observing that the cube can become slightly asymmetric under repeated subdivision.
-        We documented the asymmetry and then pre-processed the cube using edge flips and edge splits to encourage symmetry under subdivision.
-        We explain why the asymmetry occurs and how the preprocessing makes the subdivided connectivity more symmetric.
-      </p>
+		<p>
+		  During debugging, we observed an issue where after one Loop iteration on dae/cube.dae,
+		  the cube collapsed into a pinched, crumpled shape, indicating incorrect connectivity.
+		  We found that flipping too many edges after splitting corrupts the mesh. The fix was to
+		  distinguish subdivision diagonals from split halves using Edge::isNew, and to only flip
+		  edges that satisfy e&rarr;isNew and v1&rarr;isNew not equal to v2&rarr;isNew. After applying
+		  this constraint, the cube subdivides correctly and remains stable under repeated iterations.
+		</p>
+	  </div>
 
-      <div class="threecol">
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/division_sf.jpg" alt="Cube without preprocessing after repeated subdivision">
-            <figcaption class="caption">Figure 26. Cube after repeated subdivision without preprocessing (asymmetry visible).</figcaption>
-          </div>
-        </figure>
+	  <h3>Observations and screenshots after loop subdivision</h3>
 
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/sf_0.jpg" alt="Cube after preprocessing before subdivision">
-            <figcaption class="caption">Figure 27. Cube after preprocessing (edge flips/splits), before subdivision (L0).</figcaption>
-          </div>
-        </figure>
+	  <div class="placeholder">
+		<p>
+		  After subdividing the cube through several iterations, we observe smoothing behavior at
+		  corners and along edges. Sharp features become rounded because vertex positions are updated
+		  by weighted averages over one-ring neighbors. This averaging also pulls points inward, so the
+		  mesh can shrink slightly with more iterations. Figures 18–21 show the cube from L0 to L3,
+		  including softened corners, increased triangle density, and an overall rounder shape.
+		</p>
 
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/sf_2.jpg" alt="Cube after preprocessing and subdivision">
-            <figcaption class="caption">Figure 28. Cube after preprocessing and the same number of subdivisions (reduced asymmetry).</figcaption>
-          </div>
-        </figure>
-      </div>
+		<p>
+		  We also observe that repeated subdivision can introduce slight asymmetry on the cube.
+		  Although the cube is geometrically symmetric, the triangulation and connectivity on each
+		  face depends on diagonal directions. Since Loop updates depend on neighbor relationships,
+		  this connectivity bias can produce a small directional lean after multiple iterations.
+		</p>
+	  </div>
 
-      <div class="divider"></div>
-    </section>
+	  <h3>Cube: successive Loop subdivision iterations</h3>
 
-    <section id="ExtraCredit" class="content">
-      <h2>Extra Credit</h2>
+	  <div class="twocol">
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/division_0.jpg" alt="Cube loop subdivision iteration 0">
+			<figcaption class="caption">Figure 18. Cube subdivision, iteration 0 (L0).</figcaption>
+		  </div>
+		</figure>
 
-      <p class="placeholder">
-        If we implement extra credit extensions, we explain what we did and document how they work with screenshots here.
-      </p>
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/division_1.jpg" alt="Cube loop subdivision iteration 1">
+			<figcaption class="caption">Figure 19. Cube subdivision, iteration 1 (L1).</figcaption>
+		  </div>
+		</figure>
+	  </div>
 
-      <div class="twocol">
-        <figure class="figure">
-          <div class="figure-box">
-            <img src="screenshots/extra_credit.png" alt="Extra credit result">
-            <figcaption class="caption">Figure 24. Extra credit result.</figcaption>
-          </div>
-        </figure>
-      </div>
+	  <div class="twocol">
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/division_2.jpg" alt="Cube loop subdivision iteration 2">
+			<figcaption class="caption">Figure 20. Cube subdivision, iteration 2 (L2).</figcaption>
+		  </div>
+		</figure>
 
-      <div class="divider"></div>
-    </section>
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/division_3.jpg" alt="Cube loop subdivision iteration 3">
+			<figcaption class="caption">Figure 21. Cube subdivision, iteration 3 (L3).</figcaption>
+		  </div>
+		</figure>
+	  </div>
+
+	  <h3>Other mesh behavior: cow model</h3>
+
+	  <div class="threecol">
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/cow_0.jpg" alt="Cow mesh before subdivision">
+			<figcaption class="caption">Figure 22. Cow mesh before subdivision (L0).</figcaption>
+		  </div>
+		</figure>
+
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/cow_1.jpg" alt="Cow mesh after one subdivision">
+			<figcaption class="caption">Figure 23. Cow mesh after one subdivision (L1).</figcaption>
+		  </div>
+		</figure>
+
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/cow_2.jpg" alt="Cow mesh after two subdivisions">
+			<figcaption class="caption">Figure 24. Cow mesh after two subdivisions (L2).</figcaption>
+		  </div>
+		</figure>
+	  </div>
+
+	  <h3>Cube asymmetry experiment and preprocessing</h3>
+
+	  <div class="placeholder">
+		<p>
+		  We tested how edge operations affect the result of Loop subdivision in two situations.
+		  First, after subdividing, we applied edge splits and edge flips on newly created edges and
+		  confirmed the operations still behave consistently. Second, we applied a set of flips and
+		  splits before subdividing to change the cube’s triangulation and connectivity. After running
+		  Loop subdivision, the cube’s asymmetry shifted direction compared to the baseline case.
+		  This demonstrates that edge orientation and connectivity affect the neighbor averaging
+		  stencils, and therefore affect the resulting geometry under repeated subdivision.
+		</p>
+	  </div>
+
+	  <div class="threecol">
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/division_sf.jpg"
+				 alt="Cube without preprocessing after repeated subdivision">
+			<figcaption class="caption">
+			  Figure 25. Cube after repeated subdivision without preprocessing
+			  (asymmetry visible).
+			</figcaption>
+		  </div>
+		</figure>
+
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/sf_0.jpg"
+				 alt="Cube after preprocessing before subdivision">
+			<figcaption class="caption">
+			  Figure 26. Cube after preprocessing (edge flips and splits), before subdivision (L0).
+			</figcaption>
+		  </div>
+		</figure>
+
+		<figure class="figure">
+		  <div class="figure-box">
+			<img src="screenshots/sf_2.jpg"
+				 alt="Cube after preprocessing and subdivision">
+			<figcaption class="caption">
+			  Figure 27. Cube after preprocessing and the same number of subdivisions,
+			  showing the asymmetry bias shifting direction.
+			</figcaption>
+		  </div>
+		</figure>
+		</div>
+
+		<div class="divider"></div>
+		</section>
 
   </main>
 
