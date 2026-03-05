@@ -680,6 +680,11 @@
 		  edges that satisfy e&rarr;isNew and v1&rarr;isNew not equal to v2&rarr;isNew. After applying
 		  this constraint, the cube subdivides correctly and remains stable under repeated iterations.
 		</p>
+		<p>
+		  A second issue prior to this mesh fix was also that a second Loop subdivision (any further loop subdivision) caused the GUI to freeze, 
+		  likely stemming from an infinite loop somewhere. We figured out that this was also due to flipping edges that should 
+		  not be flipped, where h0 was never returned to when traversing. The above fix restored mesh connectivity and fixed this issue.
+		</p>
 	  </div>
 
 	  <h3>Observations and screenshots after loop subdivision</h3>
@@ -822,3 +827,4 @@
   </footer>
 </body>
 </html>
+
